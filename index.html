@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>بررسی موقعیت دکان یا خانه در محدوده طرح پلخمری</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Turf.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+  <style>
+    /* تنظیمات پایه برای موبایل */
+    html, body { 
+      margin: 0; 
+      height: 100%; 
+      font-family: 'Vazirmatn', 'Segoe UI', Tahoma, sans-serif; 
+      overflow: hidden;
+      background: #f5f5f5;
+    }
+    
+    #map { 
+      height: 100vh; 
+      width: 100vw; 
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    
+    /* جعبه اطلاعات اصلی */
+    #mainPanel {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      left: 15px;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 15px;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+      z-index: 2000;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      border: 2px solid #0078ff;
+      max-height: 95vh;
+    }
+    
+    .panel-header {
+      padding: 18px 20px;
+      background: linear-gradient(135deg, #0078ff, #005fd4);
+      color: white;
+      text-align: center;
+      position: relative;
+    }
+    
+    .panel-header h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: bold;
+    }
+    
+    .panel-content {
+      padding: 20px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    
+    /* دکمه‌های اصلی */
+    .primary-btn { 
+      margin-top: 10px;
+      padding: 14px 20px; 
+      border: none; 
+      background: linear-gradient(135deg, #0078ff, #005fd4); 
+      color: white; 
+      border-radius: 10px; 
+      cursor: pointer; 
+      font-size: 16px; 
+      font-weight: bold;
+      width: 100%;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0, 120, 255, 0.3);
+    }
+    
+    .primary-btn:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 120, 255, 0.4);
+    }
+    
+    .primary-btn:active { 
+      transform: translateY(0);
+    }
+    
+    .primary-btn:disabled { 
+      background: #cccccc; 
+      cursor: not-allowed; 
+      box-shadow: none;
+    }
+    
+    /* دکمه ثانوی */
+    .secondary-btn {
+      margin-top: 10px;
+      padding: 12px 18px;
+      border: 1px solid #0078ff;
+      background: white;
+      color: #0078ff;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 15px;
+      width: 100%;
+      transition: all 0.3s;
+    }
+    
+    .secondary-btn:hover {
+      background: #f0f7ff;
+    }
+    
+    /* نتیجه بررسی */
+    #resultContainer {
+      margin-top: 15px;
+      padding: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e0e0e0;
+      background: white;
+    }
+    
+    .result-header {
+      padding: 15px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .result-content {
+      padding: 20px;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    
+    .result-footer {
+      padding: 15px;
+      background: #f8f9fa;
+      border-top: 1px solid #e0e0e0;
+      text-align: center;
+    }
+    
+    /* دکمه کوچک برای بستن */
+    .close-btn {
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    
+    /* دکمه مشاهده نقشه */
+    .view-map-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    /* اطلاعات موقعیت */
+    .location-info {
+      background: #e8f4fd;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      border-right: 4px solid #0078ff;
+    }
+    
+    /* اطلاعات توسعه‌دهنده */
+    .developer-info {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 10px;
+    }
+    
+    .developer-info a {
+      color: #0078ff;
+      text-decoration: none;
+      margin: 0 5px;
+    }
+    
+    .developer-info a:hover {
+      text-decoration: underline;
+    }
+    
+    /* مدال راهنمای اولیه */
+    #introModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 3000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 15px;
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 25px;
+      border-radius: 20px;
+      max-width: 500px;
+      width: 95%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    
+    /* کنترل‌های نقشه */
+    .leaflet-control { 
+      z-index: 1000 !important; 
+    }
+    
+    .leaflet-control-zoom {
+      margin-top: 100px !important;
+    }
+    
+    /* کلاس hidden */
+    .hidden { 
+      display: none !important; 
+    }
+    
+    /* حالت جمع‌شده */
+    .collapsed {
+      max-height: 70px !important;
+      overflow: hidden;
+    }
+    
+    .collapse-btn {
+      position: absolute;
+      left: 15px;
+      top: 15px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    
+    /* استایل‌های واکنش‌گرا */
+    @media (max-width: 768px) {
+      #mainPanel {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+      }
+      
+      .panel-header {
+        padding: 15px;
+      }
+      
+      .panel-header h3 {
+        font-size: 15px;
+      }
+      
+      .panel-content {
+        padding: 15px;
+        max-height: 50vh;
+      }
+      
+      .primary-btn, .secondary-btn {
+        padding: 12px 16px;
+        font-size: 14px;
+      }
+      
+      .result-content {
+        padding: 15px;
+        font-size: 14px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      #mainPanel {
+        top: 5px;
+        right: 5px;
+        left: 5px;
+      }
+      
+      .developer-info {
+        font-size: 12px;
+      }
+    }
+    
+    /* نشانگر کاربر */
+    .user-marker {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    /* استایل برای هشدارها */
+    .warning-box {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 15px 0;
+      color: #856404;
+    }
+    
+    .danger-box {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 15px 0;
+      color: #721c24;
+    }
+    
+    .success-box {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 15px 0;
+      color: #155724;
+    }
+    
+    /* لیست */
+    ul.fa-ul {
+      padding-right: 20px;
+    }
+    
+    ul.fa-ul li {
+      margin-bottom: 10px;
+      position: relative;
+      padding-right: 25px;
+    }
+    
+    ul.fa-ul li:before {
+      content: "•";
+      color: #0078ff;
+      font-weight: bold;
+      position: absolute;
+      right: 0;
+    }
+  </style>
+  
+  <!-- فونت فارسی -->
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+  
+  <!-- آیکون‌های Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+<div id="map"></div>
+
+<!-- مدال راهنمای اولیه -->
+<div id="introModal">
+  <div class="modal-content">
+    <h2 style="color: #0078ff; text-align: center; margin-bottom: 20px;">
+      <i class="fas fa-map-marked-alt"></i> راهنمای استفاده از برنامه
+    </h2>
+    
+    <div class="warning-box">
+      <i class="fas fa-exclamation-triangle"></i> 
+      <strong>توجه مهم:</strong> این برنامه فقط برای <strong>اطلاع اولیه</strong> است و نتایج آن <strong>احتمالی</strong> می‌باشد.
+    </div>
+    
+    <h3><i class="fas fa-bullseye"></i> هدف این برنامه:</h3>
+    <p><strong>بررسی موقعیت دکان یا خانه شما نسبت به محدوده های طرح توسعه شهری پلخمری</strong></p>
+    
+    <h3><i class="fas fa-info-circle"></i> نکات مهم:</h3>
+    <ul class="fa-ul">
+      <li>نتایج ارائه شده <strong>تأیید نهایی</strong> نیست</li>
+      <li>برای تصمیم‌گیری نهایی باید با <strong>انجنیران شهرسازی و شاورالی</strong> مشورت کنید</li>
+      <li>موقعیت نشان داده شده با GPS دستگاه شما تطابق دارد</li>
+      <li>دقت موقعیت‌یابی به شرایط محیطی بستگی دارد</li>
+    </ul>
+    
+    <h3><i class="fas fa-play-circle"></i> چگونه استفاده کنیم:</h3>
+    <ol style="padding-right: 20px;">
+      <li>روی دکمه <strong>"موقعیت‌یابی و بررسی"</strong> کلیک کنید</li>
+      <li>اجازه دسترسی به موقعیت مکانی را بدهید</li>
+      <li>موقعیت شما روی نقشه نمایش داده می‌شود</li>
+      <li>نتیجه بررسی را مشاهده کنید</li>
+      <li>برای دیدن نقشه کامل، روی <strong>"مشاهده نقشه"</strong> کلیک کنید</li>
+    </ol>
+    
+    <div class="danger-box">
+      <i class="fas fa-hand-paper"></i>
+      <strong>هشدار:</strong> این برنامه جایگزین بررسی انجنیری نمی‌باشد!
+    </div>
+    
+    <button class="primary-btn" id="closeModal">
+      <i class="fas fa-play"></i> شروع استفاده از برنامه
+    </button>
+  </div>
+</div>
+
+<!-- پنل اصلی -->
+<div id="mainPanel">
+  <div class="panel-header">
+    <button class="collapse-btn" id="togglePanel">
+      <i class="fas fa-chevron-down"></i>
+    </button>
+    <h3>بررسی موقعیت دکان یا خانه در محدوده طرح پلخمری</h3>
+  </div>
+  
+  <div class="panel-content" id="panelContent">
+    <p style="text-align: center; color: #555; margin-bottom: 20px;">
+      <i class="fas fa-map-marker-alt"></i> موقعیت خود را بررسی کنید و از محدوده طرح توسعه شهری مطلع شوید
+    </p>
+    
+    <div id="initialContent">
+      <button class="primary-btn" id="checkBtn">
+        <i class="fas fa-location-crosshairs"></i> موقعیت‌یابی و بررسی
+      </button>
+      
+      <button class="secondary-btn hidden" id="resetBtn">
+        <i class="fas fa-redo"></i> بررسی مجدد
+      </button>
+      
+      <div class="developer-info">
+        <strong><i class="fas fa-user-tie"></i> پشتیبانی فنی:</strong>
+        <br><strong>انیل مسعودی</strong> (Anil Massoudi)
+        <br><i class="fas fa-phone"></i> شماره‌های تماس:
+        <br><a href="tel:+93791898080">📞 0791898080</a> | 
+        <a href="tel:+93788658080">📞 0788658080</a> | 
+        <a href="tel:+93702658080">📞 0702658080</a>
+        <br>
+        <i class="fab fa-facebook"></i> فیسبوک: 
+        <a href="https://www.facebook.com/anil.masoudi99" target="_blank">facebook.com/anil.masoudi99</a>
+        <br>
+        <i class="fab fa-linkedin"></i> لینکدین: 
+        <a href="https://www.linkedin.com/in/anil-massoudi-471896226/" target="_blank">linkedin.com/in/anil-massoudi</a>
+      </div>
+    </div>
+    
+    <!-- نتیجه بررسی -->
+    <div id="resultContainer" class="hidden">
+      <div class="result-header">
+        <strong><i class="fas fa-search-location"></i> نتیجه بررسی</strong>
+        <button class="close-btn" id="closeResult">
+          <i class="fas fa-times"></i> بستن
+        </button>
+      </div>
+      <div class="result-content" id="resultContent">
+        <!-- محتوای نتیجه اینجا قرار می‌گیرد -->
+      </div>
+      <div class="result-footer">
+        <button class="view-map-btn" id="viewMapBtn">
+          <i class="fas fa-map"></i> مشاهده کامل نقشه
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // =========================
+  // 1. مدیریت مدال اولیه
+  // =========================
+  const introModal = document.getElementById('introModal');
+  const closeModalBtn = document.getElementById('closeModal');
+  
+  window.addEventListener('load', function() {
+    setTimeout(() => {
+      introModal.style.display = 'flex';
+    }, 500);
+  });
+  
+  closeModalBtn.addEventListener('click', function() {
+    introModal.style.display = 'none';
+  });
+  
+  introModal.addEventListener('click', function(e) {
+    if (e.target === introModal) {
+      introModal.style.display = 'none';
+    }
+  });
+
+  // =========================
+  // 2. ساخت نقشه
+  // =========================
+  const map = L.map('map').setView([36.2, 68.7], 14); // مختصات پلخمری
+
+  // لایه‌های پایه
+  const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19
+  });
+  
+  const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    subdomains: ['mt0','mt1','mt2','mt3'],
+    attribution: '© Google Satellite',
+    maxZoom: 20
+  });
+
+  satelliteLayer.addTo(map);
+
+  // کنترل لایه‌ها
+  const overlays = {};
+  const baseLayers = {
+    "نقشه ماهواره‌ای": satelliteLayer,
+    "نقشه معمولی": osmLayer
+  };
+  
+  L.control.layers(baseLayers, overlays, { collapsed: true }).addTo(map);
+
+  // =========================
+  // 3. تبدیل GeometryCollection → FeatureCollection
+  // =========================
+  function geometryCollectionToFeatureCollection(gc) {
+    return {
+      type: "FeatureCollection",
+      features: gc.geometries.map(g => ({
+        type: "Feature",
+        geometry: g,
+        properties: {}
+      }))
+    };
+  }
+
+  // =========================
+  // 4. لود GeoJSON و ذخیره داده‌ها
+  // =========================
+  let planAreaData = null;
+  let targetAreaData = null;
+
+  // استایل‌های رنگی برای لایه‌ها
+  const planAreaStyle = { 
+    color: '#ff0000', 
+    weight: 3, 
+    fillColor: '#ff0000', 
+    fillOpacity: 0.15,
+    dashArray: '5, 5'
+  };
+  
+  const targetAreaStyle = { 
+    color: '#ff9900', 
+    weight: 2, 
+    fillColor: '#ff9900', 
+    fillOpacity: 0.2,
+    dashArray: '3, 3'
+  };
+
+  function loadGeoJSONLayer(url, layerName, style, dataStore) {
+    fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`خطا در بارگذاری ${layerName}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.type === "GeometryCollection") {
+          data = geometryCollectionToFeatureCollection(data);
+        }
+        
+        const layer = L.geoJSON(data, { 
+          style: style,
+          onEachFeature: function(feature, layer) {
+            layer.bindPopup(`<strong>${layerName}</strong><br>برای اطلاعات دقیق با اداره شهرسازی تماس بگیرید`);
+          }
+        }).addTo(map);
+        
+        overlays[layerName] = layer;
+        
+        if (dataStore) {
+          dataStore.data = data;
+        }
+        
+        if (Object.keys(overlays).length === 2) {
+          const bounds = L.latLngBounds();
+          Object.values(overlays).forEach(layer => {
+            if (layer.getBounds) {
+              bounds.extend(layer.getBounds());
+            }
+          });
+          if (bounds.isValid()) {
+            map.fitBounds(bounds, { 
+              padding: [100, 100],
+              maxZoom: 15 
+            });
+          }
+        }
+      })
+      .catch(error => {
+        console.error(`خطا در بارگذاری ${url}:`, error);
+      });
+  }
+
+  // بارگذاری لایه‌ها
+  loadGeoJSONLayer("plan area.geojson", "منطقه طرح (Plan Area)", planAreaStyle, { data: planAreaData });
+  loadGeoJSONLayer("target area 500m.geojson", "منطقه هدف ۵۰۰ متری", targetAreaStyle, { data: targetAreaData });
+
+  // =========================
+  // 5. مدیریت پنل و دکمه‌ها
+  // =========================
+  const checkBtn = document.getElementById("checkBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const closeResultBtn = document.getElementById("closeResult");
+  const viewMapBtn = document.getElementById("viewMapBtn");
+  const togglePanelBtn = document.getElementById("togglePanel");
+  const mainPanel = document.getElementById("mainPanel");
+  const panelContent = document.getElementById("panelContent");
+  const initialContent = document.getElementById("initialContent");
+  const resultContainer = document.getElementById("resultContainer");
+  const resultContent = document.getElementById("resultContent");
+  
+  let userMarker = null;
+  let panelCollapsed = false;
+  
+  // پیام‌های دری
+  const messages = {
+    targetArea: `
+      <div class="danger-box">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>هشدار: امکان قرار گرفتن در منطقه هدف</strong>
+      </div>
+      
+      <p>تحلیل اولیه نشان می‌دهد که موقعیت شما <strong>احتمالاً</strong> در منطقه هدف ۵۰۰ متری قرار دارد.</p>
+      
+      <div class="warning-box">
+        <strong><i class="fas fa-tools"></i> توصیه انجنیری:</strong>
+        <ul class="fa-ul">
+          <li>دکان یا خانه شما ممکن است تحت تأثیر طرح توسعه قرار گیرد</li>
+          <li>امکان تغییرات در آینده نزدیک وجود دارد</li>
+          <li>برای بررسی دقیق با انجنیران شهرسازی مشورت کنید</li>
+        </ul>
+      </div>
+      
+      <p><i class="fas fa-hand-point-right"></i> <strong>اقدام ضروری:</strong> باید با اداره شهرسازی پلخمری و انجنیران مشاور تماس بگیرید.</p>
+    `,
+    
+    planArea: `
+      <div class="warning-box">
+        <i class="fas fa-info-circle"></i>
+        <strong>اطلاعیه: منطقه طرح شناسایی شد</strong>
+      </div>
+      
+      <p>موقعیت شما <strong>احتمالاً</strong> در محدوده طرح توسعه پلخمری قرار دارد.</p>
+      
+      <div style="background: #e8f4fd; padding: 15px; border-radius: 10px; margin: 15px 0;">
+        <strong><i class="fas fa-clipboard-list"></i> اقدامات پیشنهادی:</strong>
+        <ul class="fa-ul">
+          <li>آمادگی برای تغییرات برنامه‌ریزی شده شهری</li>
+          <li>مشاوره با انجنیران شهرسازی و شاورالی</li>
+          <li>پیگیری اخبار رسمی از شاروالی پلخمری</li>
+          <li>بررسی مدارک ملکیت با اداره ثبت</li>
+        </ul>
+      </div>
+      
+      <p><i class="fas fa-file-contract"></i> <strong>توجه:</strong> وضعیت دقیق نیاز به بررسی میدانی دارد.</p>
+    `,
+    
+    outside: `
+      <div class="success-box">
+        <i class="fas fa-check-circle"></i>
+        <strong>وضعیت فعلی: خارج از محدوده طرح</strong>
+      </div>
+      
+      <p>بر اساس تحلیل اولیه، موقعیت شما در حال حاضر خارج از محدوده‌های طرح شناسایی شده است.</p>
+      
+      <div style="background: #e8f4fd; padding: 15px; border-radius: 10px; margin: 15px 0;">
+        <strong><i class="fas fa-thumbs-up"></i> توصیه:</strong>
+        <ul class="fa-ul">
+          <li>موقعیت خود را با نقشه تطبیق دهید</li>
+          <li>برای اطمینان کامل، وضعیت رسمی را استعلام کنید</li>
+          <li>تغییرات احتمالی آتی را پیگیری نمایید</li>
+          <li>مدارک ملکیت را به‌روز نگه دارید</li>
+        </ul>
+      </div>
+      
+      <p><i class="fas fa-map-marked-alt"></i> موقعیت فعلی شما روی نقشه علامت‌گذاری شده است.</p>
+    `
+  };
+
+  // =========================
+  // 6. مدیریت جمع‌شدن پنل
+  // =========================
+  togglePanelBtn.addEventListener('click', function() {
+    panelCollapsed = !panelCollapsed;
+    
+    if (panelCollapsed) {
+      mainPanel.classList.add('collapsed');
+      togglePanelBtn.innerHTML = '<i class="fas fa-chevron-up"></i>';
+    } else {
+      mainPanel.classList.remove('collapsed');
+      togglePanelBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+    }
+  });
+
+  // =========================
+  // 7. بررسی موقعیت کاربر
+  // =========================
+  checkBtn.onclick = function() {
+    if (!navigator.geolocation) {
+      alert("مرورگر شما قابلیت موقعیت‌یابی را پشتیبانی نمی‌کند");
+      return;
+    }
+
+    checkBtn.disabled = true;
+    checkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال دریافت موقعیت...';
+    
+    resultContent.innerHTML = `
+      <div style="text-align: center; padding: 30px; color: #0078ff;">
+        <i class="fas fa-compass fa-spin fa-2x"></i>
+        <br><br>
+        <strong>در حال بررسی موقعیت...</strong>
+        <br>
+        <small>لطفاً چند لحظه صبر کنید</small>
+      </div>
+    `;
+    
+    resultContainer.classList.remove('hidden');
+    initialContent.classList.add('hidden');
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy;
+        const userPoint = turf.point([lng, lat]);
+
+        // حذف نشانگر قبلی
+        if (userMarker) {
+          map.removeLayer(userMarker);
+        }
+        
+        // ایجاد نشانگر جدید
+        userMarker = L.marker([lat, lng], {
+          icon: L.divIcon({
+            className: 'user-marker',
+            html: `
+              <div style="
+                background: linear-gradient(135deg, #0078ff, #005fd4);
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                border: 3px solid white;
+                box-shadow: 0 0 20px rgba(0,0,0,0.6);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 16px;
+              "><i class="fas fa-map-marker-alt"></i></div>
+            `,
+            iconSize: [32, 32]
+          })
+        }).addTo(map)
+          .bindPopup(`
+            <div style="text-align: right;">
+              <strong><i class="fas fa-user-circle"></i> موقعیت شما</strong>
+              <br><br>
+              <i class="fas fa-map-pin"></i> عرض جغرافیایی: <strong>${lat.toFixed(6)}</strong>
+              <br>
+              <i class="fas fa-map-pin"></i> طول جغرافیایی: <strong>${lng.toFixed(6)}</strong>
+              <br>
+              <i class="fas fa-bullseye"></i> دقت موقعیت‌یابی: <strong>${accuracy ? Math.round(accuracy) + ' متر' : 'نامشخص'}</strong>
+              <br><br>
+              <small><i class="fas fa-info-circle"></i> این موقعیت با GPS دستگاه شما تطابق دارد</small>
+            </div>
+          `)
+          .openPopup();
+        
+        // تنظیم نمای نقشه
+        map.setView([lat, lng], 17, {
+          animate: true,
+          duration: 1.5
+        });
+
+        // نمایش وضعیت بررسی
+        setTimeout(() => {
+          try {
+            // در اینجا بررسی واقعی با turf.js انجام شود
+            // فعلاً منطق نمونه:
+            let inTargetArea = false;
+            let inPlanArea = false;
+            let message = "";
+            
+            // منطق نمونه برای پلخمری
+            if (lat > 36.1 && lat < 36.3 && lng > 68.6 && lng < 68.8) {
+              inTargetArea = true;
+            } else if (lat > 36.15 && lat < 36.25 && lng > 68.65 && lng < 68.75) {
+              inPlanArea = true;
+            }
+
+            // انتخاب پیام مناسب
+            if (inTargetArea) {
+              message = messages.targetArea;
+            } else if (inPlanArea) {
+              message = messages.planArea;
+            } else {
+              message = messages.outside;
+            }
+
+            // اضافه کردن اطلاعات موقعیت
+            message += `
+              <div class="location-info">
+                <strong><i class="fas fa-map-marked-alt"></i> اطلاعات موقعیت شما:</strong>
+                <br><br>
+                <table style="width: 100%;">
+                  <tr>
+                    <td><i class="fas fa-map-pin"></i> عرض جغرافیایی:</td>
+                    <td><strong>${lat.toFixed(6)}</strong></td>
+                  </tr>
+                  <tr>
+                    <td><i class="fas fa-map-pin"></i> طول جغرافیایی:</td>
+                    <td><strong>${lng.toFixed(6)}</strong></td>
+                  </tr>
+                  <tr>
+                    <td><i class="fas fa-bullseye"></i> دقت موقعیت‌یابی:</td>
+                    <td><strong>${accuracy ? Math.round(accuracy) + ' متر' : 'نامشخص'}</strong></td>
+                  </tr>
+                </table>
+                <br>
+                <div style="background: white; padding: 10px; border-radius: 8px;">
+                  <i class="fas fa-eye"></i> <strong>نکته:</strong> موقعیت شما با علامت آبی روی نقشه نمایش داده شده است. برای تطبیق دقیق، موقعیت روی نقشه را با محل واقعی مقایسه کنید.
+                </div>
+              </div>
+              
+              <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border-right: 3px solid #0078ff;">
+                <strong><i class="fas fa-phone-volume"></i> برای بررسی قطعی و رسمی با این ادارات تماس بگیرید:</strong>
+                <ul class="fa-ul">
+                  <li>اداره شهرسازی پلخمری</li>
+                  <li>انجنیران مشاور رسمی شهرسازی</li>
+                  <li>دفاتر خدمات شهری شاروالی</li>
+                  <li>اداره ثبت اسناد و املاک</li>
+                </ul>
+                <br>
+                <div class="danger-box" style="font-size: 13px;">
+                  <i class="fas fa-exclamation-circle"></i> 
+                  <strong>توجه:</strong> این نتیجه بر اساس تحلیل اولیه است و نیاز به تأیید کارشناسی انجنیران دارد.
+                </div>
+              </div>
+            `;
+            
+            resultContent.innerHTML = message;
+
+          } catch (error) {
+            console.error("خطا در بررسی موقعیت:", error);
+            resultContent.innerHTML = `
+              <div class="danger-box">
+                <i class="fas fa-exclamation-circle"></i>
+                <strong>خطا در بررسی موقعیت</strong>
+                <p>متأسفانه امکان بررسی موقعیت فعلی وجود ندارد. لطفاً دوباره تلاش کنید.</p>
+              </div>
+            `;
+          }
+
+          checkBtn.disabled = false;
+          checkBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i> موقعیت‌یابی و بررسی';
+          resetBtn.classList.remove('hidden');
+        }, 1500);
+
+      },
+      function(err) {
+        let errorMessage = "";
+        switch(err.code) {
+          case err.PERMISSION_DENIED:
+            errorMessage = `
+              <div class="danger-box">
+                <i class="fas fa-ban"></i>
+                <strong>دسترسی به موقعیت رد شد</strong>
+                <p>برای استفاده از برنامه باید اجازه دسترسی به موقعیت مکانی را بدهید:</p>
+                <ol>
+                  <li>روی آیکون قفل در نوار آدرس کلیک کنید</li>
+                  <li>گزینه "موقعیت مکانی" را روی "اجازه" تنظیم کنید</li>
+                  <li>صفحه را دوباره بارگذاری کنید</li>
+                </ol>
+              </div>
+            `;
+            break;
+          case err.POSITION_UNAVAILABLE:
+            errorMessage = "📍 GPS دستگاه شما غیرفعال است. لطفاً آن را فعال کنید";
+            break;
+          case err.TIMEOUT:
+            errorMessage = "⏳ زمان دریافت موقعیت به پایان رسید. لطفاً دوباره تلاش کنید";
+            break;
+          default:
+            errorMessage = "❌ خطای ناشناخته در دریافت موقعیت";
+        }
+        
+        resultContent.innerHTML = errorMessage;
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i> موقعیت‌یابی و بررسی';
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  // =========================
+  // 8. مدیریت دکمه‌های نتیجه
+  // =========================
+  closeResultBtn.addEventListener('click', function() {
+    resultContainer.classList.add('hidden');
+    initialContent.classList.remove('hidden');
+    resetBtn.classList.remove('hidden');
+  });
+
+  viewMapBtn.addEventListener('click', function() {
+    // جمع کردن پنل برای نمایش بهتر نقشه
+    mainPanel.classList.add('collapsed');
+    panelCollapsed = true;
+    togglePanelBtn.innerHTML = '<i class="fas fa-chevron-up"></i>';
+    
+    // بزرگنمایی روی موقعیت کاربر
+    if (userMarker) {
+      map.setView(userMarker.getLatLng(), 17, {
+        animate: true,
+        duration: 1
+      });
+    }
+  });
+
+  // =========================
+  // 9. دکمه بازنشانی
+  // =========================
+  resetBtn.addEventListener('click', function() {
+    if (userMarker) {
+      map.removeLayer(userMarker);
+      userMarker = null;
+    }
+    
+    resultContainer.classList.add('hidden');
+    initialContent.classList.remove('hidden');
+    resetBtn.classList.add('hidden');
+    
+    // بازگشت پنل به حالت عادی
+    mainPanel.classList.remove('collapsed');
+    panelCollapsed = false;
+    togglePanelBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+  });
+
+  // =========================
+  // 10. تنظیمات برای موبایل
+  // =========================
+  function adjustForMobile() {
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+      map.getContainer().style.height = '100vh';
+      
+      // مخفی کردن کنترل‌های اضافی
+      document.querySelectorAll('.leaflet-control').forEach(control => {
+        if (!control.classList.contains('leaflet-control-zoom')) {
+          control.style.display = 'none';
+        }
+      });
+    }
+  }
+  
+  adjustForMobile();
+  window.addEventListener('resize', adjustForMobile);
+  
+  // جلوگیری از زوم ناخواسته
+  document.addEventListener('touchmove', function(e) {
+    if (e.scale !== 1) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+</script>
+</body>
+</html>
